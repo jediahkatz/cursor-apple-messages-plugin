@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "messages": {
+      "command": "./bin/messages-mcp"
+    }
+  }
+}

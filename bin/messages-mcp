@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Launch the Messages MCP server (stdio) or CLI.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+export PYTHONPATH="$ROOT/src${PYTHONPATH:+:$PYTHONPATH}"
+
+if [[ -n "${MESSAGES_PYTHON:-}" && -x "${MESSAGES_PYTHON}" ]]; then
+  PY="$MESSAGES_PYTHON"
+elif [[ -x /opt/homebrew/bin/python3 ]]; then
+  PY=/opt/homebrew/bin/python3
+elif [[ -x /usr/local/bin/python3 ]]; then
+  PY=/usr/local/bin/python3
+elif [[ -x /usr/bin/python3 ]]; then
+  PY=/usr/bin/python3
+else
+  PY="$(command -v python3)"
+fi
+
+exec "$PY" -m messages_mcp "$@"

@@ -1,0 +1,16 @@
+{
+  "name": "apple-messages",
+  "owner": {
+    "name": "Jediah Katz"
+  },
+  "metadata": {
+    "description": "Local marketplace for the Messages plugin"
+  },
+  "plugins": [
+    {
+      "name": "messages-for-cursor",
+      "source": ".",
+      "description": "Send and read Apple Messages conversations from Cursor using this Mac."
+    }
+  ]
+}
