@@ -9,5 +9,6 @@
   "license": "MIT",
   "category": "Inbox and Collaboration",
   "keywords": ["imessage", "messages", "sms", "cursor", "mcp", "macos"],
-  "logo": "assets/logo.png"
+  "logo": "assets/logo.png",
+  "hooks": "hooks/hooks.json"
 }

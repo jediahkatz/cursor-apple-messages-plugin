@@ -7,6 +7,15 @@ import SwiftUI
 /// Display name for the menu bar and Dock. LaunchServices takes this from
 /// the executable filename `bin/Messages for Cursor`.
 private let appDisplayName = "Messages for Cursor"
+private let stateDirectory: URL = {
+    if let override = ProcessInfo.processInfo.environment["MESSAGES_STATE_DIR"], !override.isEmpty {
+        return URL(fileURLWithPath: override, isDirectory: true)
+    }
+    return FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".cursor/messages", isDirectory: true)
+}()
+private let chatDBPath = ProcessInfo.processInfo.environment["MESSAGES_DB_PATH"]
+    ?? NSHomeDirectory() + "/Library/Messages/chat.db"
 
 /// The MCP server opens this window on startup, so a manual `onboard` run (or
 /// an MCP restart) can otherwise stack up duplicate windows.
@@ -18,10 +27,8 @@ private enum SingleInstance {
 
     /// Exits if another instance is already up, asking it to come forward.
     static func enforceOrExit() {
-        let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".cursor/messages")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let path = dir.appendingPathComponent("onboard.lock").path
+        try? FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
+        let path = stateDirectory.appendingPathComponent("onboard.lock").path
 
         // If the lock is unusable, showing a second window beats showing none.
         let fd = open(path, O_CREAT | O_RDWR, 0o644)
@@ -100,6 +107,7 @@ final class PermModel: ObservableObject {
     /// Kinds with a native dialog still on screen. Only these keep a spinner.
     private var inFlight: Set<PermKind> = []
     private var completionScheduled = false
+    private var refreshing = false
 
     init() {
         contacts = Self.permissionState()["contacts_ok"] as? Bool == true
@@ -125,19 +133,24 @@ final class PermModel: ObservableObject {
     }
 
     func refresh() {
-        let diskOK = Self.chatDBReadable()
-        let autoOK = Self.messagesControllable()
-        DispatchQueue.main.async {
-            self.apply(.automation, granted: autoOK)
-            self.apply(.disk, granted: diskOK)
+        guard !refreshing else { return }
+        refreshing = true
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let diskOK = Self.chatDBReadable()
+            let autoOK = Self.messagesControllable()
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.refreshing = false
+                self.apply(.automation, granted: autoOK)
+                self.apply(.disk, granted: diskOK)
 
-            if autoOK && self.contacts == .allowed && diskOK {
-                Self.markComplete()
-                if !self.completionScheduled {
-                    self.completionScheduled = true
-                    // Briefly show the final Done state before dismissing.
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                        NSApp.terminate(nil)
+                if autoOK && self.contacts == .allowed && diskOK {
+                    Self.markComplete()
+                    if !self.completionScheduled {
+                        self.completionScheduled = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                            NSApp.terminate(nil)
+                        }
                     }
                 }
             }
@@ -168,10 +181,8 @@ final class PermModel: ObservableObject {
     }
 
     private static var permissionsURL: URL {
-        let dir = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".cursor/messages")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("perms.json")
+        try? FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
+        return stateDirectory.appendingPathComponent("perms.json")
     }
 
     private static func permissionState() -> [String: Any] {
@@ -193,13 +204,11 @@ final class PermModel: ObservableObject {
     }
 
     private static func markComplete() {
-        var updates: [String: Any] = [:]
-        updates["onboarding_complete"] = true
-        updates["chat_db_ok"] = true
-        updates["contacts_ok"] = true
-        updates["contacts_denied"] = false
-        updates["last_prompt"] = Date().timeIntervalSince1970
-        updatePermissionState(updates)
+        updatePermissionState([
+            "onboarding_complete": true,
+            "contacts_ok": true,
+            "contacts_denied": false,
+        ])
     }
 
     func allow(_ kind: PermKind) {
@@ -251,8 +260,7 @@ final class PermModel: ObservableObject {
         case .disk:
             // No dialog to await — this is granted in System Settings, and only
             // takes effect once Cursor restarts. A spinner would never resolve.
-            let db = NSHomeDirectory() + "/Library/Messages/chat.db"
-            _ = FileManager.default.contents(atPath: db)
+            _ = Self.chatDBReadable()
             Self.openPrivacyPane("Privacy_AllFiles")
         }
     }
@@ -310,14 +318,13 @@ final class PermModel: ObservableObject {
 
     private static func chatDBReadable() -> Bool {
         var db: OpaquePointer?
-        let uri = "file:\(NSHomeDirectory())/Library/Messages/chat.db?mode=ro"
-        guard sqlite3_open_v2(uri, &db, SQLITE_OPEN_READONLY | SQLITE_OPEN_URI, nil) == SQLITE_OK else {
+        guard sqlite3_open_v2(chatDBPath, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
             sqlite3_close(db)
             return false
         }
         defer { sqlite3_close(db) }
         var stmt: OpaquePointer?
-        let ok = sqlite3_prepare_v2(db, "SELECT 1", -1, &stmt, nil) == SQLITE_OK
+        let ok = sqlite3_prepare_v2(db, "SELECT ROWID FROM message LIMIT 1", -1, &stmt, nil) == SQLITE_OK
         sqlite3_finalize(stmt)
         return ok
     }
@@ -343,12 +350,10 @@ struct OnboardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header App Icons
             headerIcons
                 .padding(.top, 32)
                 .padding(.bottom, 16)
 
-            // Header Title
             Text("Enable Messages for Cursor")
                 .font(.system(size: 23, weight: .bold))
                 .foregroundColor(Color(red: 0.12, green: 0.12, blue: 0.13))
@@ -356,7 +361,6 @@ struct OnboardView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 10)
 
-            // Subtitle
             Text("Cursor needs macOS permissions to send messages, find contacts by name, and search your messages when asked.")
                 .font(.system(size: 13, weight: .regular))
                 .foregroundColor(Color(red: 0.44, green: 0.44, blue: 0.47))
@@ -366,7 +370,6 @@ struct OnboardView: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.bottom, 24)
 
-            // Cards list
             VStack(spacing: 12) {
                 row(
                     .automation,

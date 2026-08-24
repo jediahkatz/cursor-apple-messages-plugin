@@ -2,7 +2,7 @@
 
 Connect Cursor to Apple Messages on this Mac. The plugin reads `~/Library/Messages/chat.db` for history and new-message detection, and sends through Messages.app via AppleScript. No external server, no tokens.
 
-macOS only.
+macOS only. The plugin can be installed elsewhere, but permission onboarding is skipped and every tool except `messages_status` returns a clear unsupported-platform error.
 
 This follows the [Cursor plugin API](https://cursor.com/docs/reference/plugins): a `.cursor-plugin/plugin.json` manifest, skills, commands, and an `mcp.json` stdio server.
 
@@ -18,6 +18,16 @@ Then enable third-party plugins if needed, and run **Developer: Reload Window**.
 The first time the MCP server starts, it opens a native **Enable Messages for Cursor** window (same idea as ChatGPT’s). Allow triggers the real macOS permissions for Messages Automation, Contacts, and Full Disk Access. Apple still requires a click, and Full Disk Access still jumps to System Settings. Re-show it with `./bin/messages-mcp onboard`.
 
 The window is a bundle-less helper (`macos/Onboarding.swift`, built on demand by `macos/build.sh`). That is deliberate: an `.app` bundle would get its own TCC identity, so grants would land on the helper instead of Cursor.
+
+## Send confirmation
+
+`send_message` and `reply` open a native confirmation before Cursor executes them. Choose **Skip**, **Send**, or **Always Send**. Always Send delivers the current message and bypasses later confirmations for the current Cursor agent; reset all bypassed confirmations with:
+
+```bash
+./bin/messages-mcp reset-confirmations
+```
+
+The hook fails closed, so a missing, crashed, or timed-out confirmation helper blocks the send. The direct CLI `send` command uses the same confirmation window.
 
 ## Tools
 

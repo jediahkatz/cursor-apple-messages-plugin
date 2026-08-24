@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeMCPExecution": [
+      {
+        "type": "command",
+        "command": "./bin/messages-confirm",
+        "timeout": 300,
+        "failClosed": true
+      }
+    ]
+  }
+}

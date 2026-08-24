@@ -9,3 +9,5 @@ build/
 
 # Compiled by macos/build.sh on first run
 bin/Messages for Cursor
+bin/confirmation/
+bin/.native-build.lock

@@ -23,9 +23,6 @@ Call the `messages_status` tool (or run `./bin/messages-mcp status`). Then:
      `/messages-access allow +15551234567` (or an Apple ID email).
    - Someone allowed → ready.
 
-Do not recommend pairing as the default. Pairing auto-replies a code to every
-contact who texts this Mac. Prefer an explicit allowlist.
-
 Permissions are requested when the MCP server first starts via a native
 **Enable Messages for Cursor** window (not a chat tool): Allow Messages
 Automation, Contacts, and Full Disk Access. If they dismissed it, they can run

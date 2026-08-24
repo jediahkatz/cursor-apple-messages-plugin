@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# This hook runs before every MCP call. Let unrelated servers through without
+# depending on Python, so failClosed only affects this plugin's send tools.
+INPUT=""
+IFS= read -r -d '' INPUT || true
+if [[ ! "$INPUT" =~ \"command\"[[:space:]]*:[[:space:]]*\"[^\"]*messages-mcp ]] ||
+   [[ ! "$INPUT" =~ \"tool_name\"[[:space:]]*:[[:space:]]*\"(send_message|reply)\" ]]; then
+  printf '{"permission":"allow"}\n'
+  exit 0
+fi
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+export MESSAGES_MODULE=messages_mcp.confirm
+printf '%s' "$INPUT" | "$ROOT/bin/messages-mcp"

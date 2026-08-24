@@ -13,7 +13,7 @@ class ContactMatch:
 
 
 def normalize_handle(value: str) -> str:
-    raw = (value or "").strip()
+    raw = value.strip()
     if not raw:
         return raw
     if "@" in raw:
@@ -29,7 +29,7 @@ def normalize_handle(value: str) -> str:
 
 
 def looks_like_handle(value: str) -> bool:
-    raw = (value or "").strip()
+    raw = value.strip()
     if "@" in raw:
         return True
     digits = re.sub(r"\D", "", raw)

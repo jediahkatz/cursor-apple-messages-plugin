@@ -69,12 +69,6 @@ def apple_date(ns: int | None) -> datetime:
     return datetime.fromtimestamp(ns / 1e9 + APPLE_EPOCH_MS / 1000, tz=timezone.utc)
 
 
-def expand_tilde(path: str) -> str:
-    if path.startswith("~/"):
-        return str(Path.home() / path[2:])
-    return path
-
-
 class ChatDB:
     def __init__(self, path: Path | None = None) -> None:
         self.path = path or CHAT_DB
@@ -89,6 +83,8 @@ class ChatDB:
             self.conn.row_factory = sqlite3.Row
             self.conn.execute("SELECT ROWID FROM message LIMIT 1").fetchone()
         except sqlite3.Error as exc:
+            if self.conn is not None:
+                self.conn.close()
             self.conn = None
             msg = str(exc)
             if "authorization denied" in msg.lower() or "unable to open" in msg.lower():
@@ -144,27 +140,8 @@ class ChatDB:
         parsed = parse_attributed_body(body if isinstance(body, (bytes, bytearray)) else None)
         return parsed or ""
 
-    def _image_path(self, message_id: int) -> str | None:
-        rows = self.require().execute(
-            """
-            SELECT a.filename, a.mime_type
-            FROM attachment a
-            JOIN message_attachment_join maj ON maj.attachment_id = a.ROWID
-            WHERE maj.message_id = ?
-            """,
-            (message_id,),
-        ).fetchall()
-        for row in rows:
-            filename = row["filename"]
-            mime = row["mime_type"] or ""
-            if not filename:
-                continue
-            if mime and not mime.startswith("image/"):
-                continue
-            return expand_tilde(filename)
-        return None
-
     def _row_from(self, row: sqlite3.Row) -> MessageRow:
+        image_path = row["image_path"]
         return MessageRow(
             rowid=int(row["rowid"]),
             guid=row["guid"],
@@ -176,14 +153,23 @@ class ChatDB:
             chat_style=row["chat_style"],
             service=row["service"],
             has_attachments=bool(row["cache_has_attachments"]),
-            image_path=self._image_path(int(row["rowid"])) if row["cache_has_attachments"] else None,
+            image_path=str(Path(image_path).expanduser()) if image_path else None,
             display_name=row["display_name"] if "display_name" in row.keys() else None,
         )
 
     _SELECT = """
         SELECT m.ROWID AS rowid, m.guid, m.text, m.attributedBody, m.date, m.is_from_me,
                m.cache_has_attachments, m.service, h.id AS handle_id,
-               c.guid AS chat_guid, c.style AS chat_style, c.display_name AS display_name
+               c.guid AS chat_guid, c.style AS chat_style, c.display_name AS display_name,
+               (
+                   SELECT a.filename
+                   FROM attachment a
+                   JOIN message_attachment_join maj ON maj.attachment_id = a.ROWID
+                   WHERE maj.message_id = m.ROWID
+                     AND a.filename IS NOT NULL
+                     AND (a.mime_type IS NULL OR a.mime_type = '' OR a.mime_type LIKE 'image/%')
+                   LIMIT 1
+               ) AS image_path
         FROM message m
         JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
         JOIN chat c ON c.ROWID = cmj.chat_id

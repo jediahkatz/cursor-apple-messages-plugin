@@ -16,4 +16,4 @@ else
   PY="$(command -v python3)"
 fi
 
-exec "$PY" -m messages_mcp "$@"
+exec "$PY" -m "${MESSAGES_MODULE:-messages_mcp}" "$@"

@@ -6,23 +6,14 @@ import subprocess
 import sys
 import threading
 import time
-from pathlib import Path
 
 from messages_mcp.access import STATE_DIR
-from messages_mcp.db import CHAT_DB
+from messages_mcp.db import CHAT_DB, ChatDB
+from messages_mcp.native import ensure_binary
 
 PERMS_FILE = STATE_DIR / "perms.json"
 FDA_PANE = "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"
 AUTOMATION_PANE = "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
-
-
-def plugin_root() -> Path:
-    return Path(__file__).resolve().parents[2]
-
-
-def onboard_binary() -> Path:
-    # Filename doubles as the window's app name in the menu bar and Dock.
-    return plugin_root() / "bin" / "Messages for Cursor"
 
 
 def _osascript(script: str, timeout: float = 5.0) -> bool:
@@ -65,44 +56,23 @@ def _save(data: dict) -> None:
 
 
 def chat_db_readable() -> bool:
+    db = ChatDB(CHAT_DB)
     try:
-        import sqlite3
-
-        conn = sqlite3.connect(f"file:{CHAT_DB}?mode=ro", uri=True, timeout=2)
-        try:
-            conn.execute("SELECT 1").fetchone()
-        finally:
-            conn.close()
-        return True
-    except Exception:
-        return False
-
-
-def _ensure_binary() -> Path | None:
-    path = onboard_binary()
-    if path.is_file() and os.access(path, os.X_OK):
-        return path
-    build = plugin_root() / "macos" / "build.sh"
-    if not build.is_file():
-        return None
-    try:
-        subprocess.run(["bash", str(build)], check=True, timeout=60, capture_output=True)
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
-        sys.stderr.write(f"messages: onboarding build failed: {exc}\n")
-        return None
-    return path if path.is_file() else None
+        return db.conn is not None
+    finally:
+        db.close()
 
 
 def show_onboarding(*, force: bool = False) -> None:
     """Open the ChatGPT-style permission window. Not an MCP tool."""
+    if sys.platform != "darwin":
+        return
     if os.environ.get("MESSAGES_SKIP_PERM_PROMPT", "").lower() in {"1", "true", "yes"}:
         return
     state = _load()
-    # contacts_ok was added when Contacts became its own real permission
-    # step. Re-open once for installs completed by an older onboarding build.
-    if not force and state.get("onboarding_complete") and state.get("contacts_ok"):
+    if not force and state.get("onboarding_complete"):
         return
-    binary = _ensure_binary()
+    binary = ensure_binary("Messages for Cursor", "onboarding")
     if binary is None:
         sys.stderr.write("messages: onboarding helper missing; falling back to Settings panes\n")
         _fallback_prompt(state)
@@ -118,8 +88,6 @@ def show_onboarding(*, force: bool = False) -> None:
         sys.stderr.write(f"messages: failed to launch onboarding: {exc}\n")
         _fallback_prompt(state)
         return
-    state["onboarding_shown"] = time.time()
-    _save(state)
 
 
 def _fallback_prompt(state: dict) -> None:
@@ -143,7 +111,6 @@ def _fallback_prompt(state: dict) -> None:
             pass
         _open_url(FDA_PANE)
         state["fda_pane_opened"] = time.time()
-    state["last_prompt"] = time.time()
     _save(state)
 
 
