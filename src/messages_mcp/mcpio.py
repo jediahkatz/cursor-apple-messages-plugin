@@ -2,36 +2,25 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Any
+from typing import Any, BinaryIO
 
 
-def read_message() -> dict[str, Any] | None:
-    headers: dict[str, str] = {}
+def read_message(stream: BinaryIO | None = None) -> dict[str, Any] | None:
+    source = stream or sys.stdin.buffer
     while True:
-        line = sys.stdin.buffer.readline()
+        line = source.readline()
         if not line:
             return None
-        if line in (b"\r\n", b"\n"):
-            break
-        decoded = line.decode("utf-8")
-        if ":" not in decoded:
+        if not line.strip():
             continue
-        key, value = decoded.split(":", 1)
-        headers[key.strip().lower()] = value.strip()
-    try:
-        length = int(headers.get("content-length", "0"))
-    except ValueError:
-        return None
-    if length <= 0:
-        return None
-    body = sys.stdin.buffer.read(length)
-    if len(body) < length:
-        return None
-    return json.loads(body.decode("utf-8"))
+        message = json.loads(line)
+        if not isinstance(message, dict):
+            raise ValueError("MCP message must be a JSON object")
+        return message
 
 
-def write_message(payload: dict[str, Any]) -> None:
+def write_message(payload: dict[str, Any], stream: BinaryIO | None = None) -> None:
+    destination = stream or sys.stdout.buffer
     data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    sys.stdout.buffer.write(f"Content-Length: {len(data)}\r\n\r\n".encode("ascii"))
-    sys.stdout.buffer.write(data)
-    sys.stdout.buffer.flush()
+    destination.write(data + b"\n")
+    destination.flush()

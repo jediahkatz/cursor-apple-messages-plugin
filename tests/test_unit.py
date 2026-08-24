@@ -1,9 +1,11 @@
+import io
 import json
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock
 
 import messages_mcp.server as server_module
+from messages_mcp import mcpio
 from messages_mcp.confirm import handle_event
 from messages_mcp.contacts import ContactMatch, looks_like_handle, normalize_handle
 from messages_mcp.db import parse_attributed_body
@@ -30,6 +32,19 @@ def test_parse_attributed_body_small_length() -> None:
     payload = b"hello"
     blob = b"NSString" + b"\x00\x2b" + bytes([len(payload)]) + payload
     assert parse_attributed_body(blob) == "hello"
+
+
+def test_mcp_stdio_uses_newline_delimited_json() -> None:
+    incoming = io.BytesIO(b'{"jsonrpc":"2.0","id":1,"method":"ping"}\n')
+    assert mcpio.read_message(incoming) == {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "ping",
+    }
+
+    outgoing = io.BytesIO()
+    mcpio.write_message({"jsonrpc": "2.0", "id": 1, "result": {}}, outgoing)
+    assert outgoing.getvalue() == b'{"jsonrpc":"2.0","id":1,"result":{}}\n'
 
 
 def test_partial_delivery_is_not_retried_to_another_handle() -> None:

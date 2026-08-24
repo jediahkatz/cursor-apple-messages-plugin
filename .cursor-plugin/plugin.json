@@ -1,7 +1,7 @@
 {
   "name": "messages-for-cursor",
   "displayName": "Messages",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Send and read Apple Messages conversations from Cursor using this Mac. Local-only bridge with allowlist access control.",
   "author": {
     "name": "Jediah Katz"
