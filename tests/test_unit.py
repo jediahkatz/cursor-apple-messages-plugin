@@ -78,7 +78,7 @@ def test_partial_delivery_is_not_retried_to_another_handle() -> None:
 def confirmation_event() -> dict:
     return {
         "conversation_id": "cursor-chat-1",
-        "command": "./bin/messages-mcp",
+        "mcp_server_name": "messages",
         "tool_name": "send_message",
         "tool_input": {"to": "+15550000001", "text": "Hello"},
     }
@@ -111,7 +111,7 @@ def test_skip_denies_send() -> None:
 
 def test_unrelated_mcp_tool_is_allowed_without_prompt() -> None:
     event = confirmation_event()
-    event["command"] = "another-mcp-server"
+    event["mcp_server_name"] = "another-mcp-server"
     confirm = Mock()
 
     assert handle_event(event, confirm=confirm, platform="darwin") == {"permission": "allow"}

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -14,6 +13,7 @@ from messages_mcp.access import STATE_DIR
 from messages_mcp.native import ensure_binary
 
 CONFIRMATIONS_FILE = STATE_DIR / "confirmations.json"
+MCP_SERVER_NAME = "messages"
 SEND_TOOLS = {"send_message", "reply"}
 
 
@@ -23,15 +23,10 @@ class ConfirmationDecision(TypedDict):
 
 
 def _is_messages_send(event: dict[str, Any]) -> bool:
-    if event.get("tool_name") not in SEND_TOOLS:
-        return False
-    command = event.get("command")
-    if not isinstance(command, str):
-        return False
-    try:
-        return any(Path(part).name == "messages-mcp" for part in shlex.split(command))
-    except ValueError:
-        return False
+    return (
+        event.get("mcp_server_name") == MCP_SERVER_NAME
+        and event.get("tool_name") in SEND_TOOLS
+    )
 
 
 def _tool_input(event: dict[str, Any]) -> dict[str, Any]:

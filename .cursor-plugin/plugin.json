@@ -1,14 +1,14 @@
 {
   "name": "messages-for-cursor",
   "displayName": "Messages",
-  "version": "0.1.1",
-  "description": "Send and read Apple Messages conversations from Cursor using this Mac. Local-only bridge with allowlist access control.",
+  "version": "0.1.2",
+  "description": "Send and read Apple Messages conversations from Cursor using this Mac.",
   "author": {
     "name": "Jediah Katz"
   },
   "license": "MIT",
   "category": "Inbox and Collaboration",
   "keywords": ["imessage", "messages", "sms", "cursor", "mcp", "macos"],
-  "logo": "assets/logo.png",
+  "logo": "assets/messages.png",
   "hooks": "hooks/hooks.json"
 }

@@ -5,7 +5,7 @@ set -euo pipefail
 # depending on Python, so failClosed only affects this plugin's send tools.
 INPUT=""
 IFS= read -r -d '' INPUT || true
-if [[ ! "$INPUT" =~ \"command\"[[:space:]]*:[[:space:]]*\"[^\"]*messages-mcp ]] ||
+if [[ ! "$INPUT" =~ \"mcp_server_name\"[[:space:]]*:[[:space:]]*\"messages\" ]] ||
    [[ ! "$INPUT" =~ \"tool_name\"[[:space:]]*:[[:space:]]*\"(send_message|reply)\" ]]; then
   printf '{"permission":"allow"}\n'
   exit 0
