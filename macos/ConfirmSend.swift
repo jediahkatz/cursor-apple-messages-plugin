@@ -38,10 +38,12 @@ private struct ConfirmationView: View {
         input.files.prefix(3).map { URL(fileURLWithPath: $0).lastPathComponent }
     }
 
-    private var initials: String {
-        let words = input.recipient.split(whereSeparator: { $0.isWhitespace })
-        let letters = words.prefix(2).compactMap(\.first)
-        return letters.isEmpty ? "?" : letters.map(String.init).joined().uppercased()
+    private var initials: String? {
+        let letters = input.recipient
+            .split(whereSeparator: { $0.isWhitespace })
+            .prefix(2)
+            .compactMap { word in word.first(where: \.isLetter) }
+        return letters.isEmpty ? nil : letters.map(String.init).joined().uppercased()
     }
 
     private var contactBadge: some View {
@@ -57,9 +59,21 @@ private struct ConfirmationView: View {
                         endPoint: .bottom
                     )
                 )
-            Text(initials)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.white)
+            if let initials {
+                Text(initials)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white)
+            } else {
+                VStack(spacing: 1) {
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 8, height: 8)
+                    Ellipse()
+                        .fill(.white)
+                        .frame(width: 17, height: 9)
+                }
+                .offset(y: 1)
+            }
         }
         .frame(width: 28, height: 28)
     }

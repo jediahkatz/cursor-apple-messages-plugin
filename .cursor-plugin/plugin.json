@@ -1,7 +1,7 @@
 {
   "name": "messages-for-cursor",
   "displayName": "Messages",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Send and read Apple Messages conversations from Cursor using this Mac.",
   "author": {
     "name": "Jediah Katz"
